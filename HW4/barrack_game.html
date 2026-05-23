@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚔️ 帝國兵工廠自動化控制台</title>
+    <style>
+        :root {
+            --bg-color: #0d0e12;
+            --panel-bg: linear-gradient(145deg, #151821, #1b1f2b);
+            --border-color: #2a3145;
+            --text-color: #e2e8f0;
+            --primary-color: #3b82f6;
+            --accent-green: #10b981;
+            --accent-gold: #fbbf24;
+            --accent-red: #ef4444;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(30, 41, 59, 0.5) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(17, 24, 39, 0.5) 0%, transparent 40%);
+            color: var(--text-color);
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%; max-width: 1100px;
+            display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 25px;
+        }
+
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: var(--panel-bg); border: 2px solid var(--border-color);
+            border-radius: 20px; padding: 28px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+            position: relative; overflow: hidden;
+        }
+
+        .panel::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-gold));
+        }
+
+        h2 { margin-top: 0; margin-bottom: 25px; font-size: 1.6rem; display: flex; align-items: center; gap: 10px; }
+
+        .status-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+
+        .status-card {
+            background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color);
+            padding: 15px; border-radius: 12px; text-align: center; font-size: 1.2rem; font-weight: bold;
+        }
+        .gold-box { color: var(--accent-gold); border-color: rgba(251, 191, 36, 0.3); }
+        .round-box { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); }
+
+        .factory-lane {
+            background: rgba(7, 9, 15, 0.6); border: 2px solid #22293a;
+            border-radius: 16px; padding: 20px; margin-bottom: 20px;
+        }
+        
+        .lane-header { font-size: 1rem; color: #94a3b8; margin-bottom: 15px; display: flex; justify-content: space-between; font-weight: bold; }
+
+        .queue-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; min-height: 90px; }
+
+        .unit-card {
+            background: linear-gradient(135deg, #1e2640 0%, #2a365c 100%); border: 2px solid #3b82f6;
+            border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            animation: spawn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .unit-info { display: flex; align-items: center; gap: 12px; }
+
+        .unit-icon {
+            font-size: 2rem; background: rgba(0, 0, 0, 0.3); width: 45px; height: 45px;
+            display: flex; align-items: center; justify-content: center; border-radius: 8px;
+        }
+
+        .unit-name { font-weight: bold; color: #fff; }
+
+        .progress-bar-container { background: #0f172a; height: 6px; border-radius: 3px; margin-top: 10px; overflow: hidden; }
+
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #3b82f6, #10b981); height: 100%; width: 40%;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        .queue-container .unit-card:first-child .progress-bar-fill { width: 85%; background: linear-gradient(90deg, #10b981, #34d399); }
+
+        .empty-slot {
+            border: 2px dashed #2a3145; border-radius: 12px; display: flex; align-items: center;
+            justify-content: center; color: #475569; font-style: italic; font-size: 0.9rem; background: rgba(0,0,0,0.1);
+        }
+
+        .btn-control {
+            width: 100%; background: linear-gradient(135deg, #d97706 0%, #b45309 100%); border: 1px solid #f59e0b;
+            color: white; padding: 16px; border-radius: 12px; font-size: 1.2rem; font-weight: bold;
+            cursor: pointer; transition: transform 0.1s, box-shadow 0.2s; box-shadow: 0 5px 15px rgba(217, 119, 6, 0.3);
+        }
+        .btn-control:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(217, 119, 6, 0.5); }
+        .btn-control:disabled { background: #334155; border-color: #1e293b; color: #64748b; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        .log-panel { background: #07090e; border: 2px solid var(--border-color); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; height: 560px; }
+        .log-output { flex-grow: 1; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.95rem; line-height: 1.6; }
+        .log-line { margin-bottom: 8px; padding-left: 5px; }
+        .log-round-header { color: #38bdf8; font-weight: bold; margin-top: 15px; border-bottom: 1px dashed #1e293b; padding-bottom: 4px; }
+        .log-success { color: var(--accent-green); font-weight: bold; }
+        .log-warn { color: var(--accent-gold); }
+        .log-error { color: var(--accent-red); font-weight: bold; }
+        .log-info { color: #64748b; }
+
+        @keyframes spawn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="panel">
+        <h2>🏭 帝國兵工廠大腦 (純網頁運行版)</h2>
+        
+        <div class="status-bar">
+            <div class="status-card round-box">⌛ 當前回合: <span id="round-display">0</span></div>
+            <div class="status-card gold-box">💰 國庫黃金: <span id="gold-display">150</span> 包</div>
+        </div>
+
+        <div class="factory-lane">
+            <div class="lane-header">
+                <span>⚔️ 產線 A (優先發派廠)</span>
+                <span id="count-A" style="color: #3b82f6;">0 / 2 滿</span>
+            </div>
+            <div id="lane-A-queue" class="queue-container"></div>
+        </div>
+
+        <div class="factory-lane">
+            <div class="lane-header">
+                <span>🏹 產線 B (分流附屬廠)</span>
+                <span id="count-B" style="color: #3b82f6;">0 / 2 滿</span>
+            </div>
+            <div id="lane-B-queue" class="queue-container"></div>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button id="next-btn" class="btn-control" onclick="executeNextRound()">指揮部：執行下一回合指令 ➔</button>
+        </div>
+    </div>
+
+    <div class="log-panel">
+        <h2>📜 戰術調度觀測日誌</h2>
+        <div id="log-output" class="log-output">
+            <div class="log-line log-info">[系統] 核心調度邏輯載入完畢，等待指揮官下達指令...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. 將 Python 變數完全對應到 JavaScript
+    let playerGold = 150;
+    let barracks_A = [];
+    let barracks_B = [];
+    const MAX_CAPACITY = 2;
+    let currentRound = 0;
+
+    const unitIcons = { "劍士": "⚔️", "弓手": "🏹", "騎士": "🐴", "投石車": "☄️", "巨龍": "🐲" };
+
+    // 模擬訂單
+    const orders = [
+        {"unit": "劍士", "cost": 20},    // 第 0 回合
+        {"unit": "弓手", "cost": 30},    // 第 1 回合
+        {"unit": "騎士", "cost": 50},    // 第 2 回合
+        {"unit": "投石車", "cost": 40},  // 第 3 回合
+        {},                             // 第 4 回合 (空單)
+        {"unit": "巨龍", "cost": 500}   // 第 5 回合
+    ];
+
+    // 初始化畫面空位
+    updateUI();
+
+    // 2. 核心邏輯（由 Python 的 for 迴圈拆解為按鈕點擊觸發）
+    function executeNextRound() {
+        if (currentRound >= orders.length) {
+            appendLog("[系統] 所有戰術指令處理完畢，演練結束。", "info");
+            document.getElementById("next-btn").disabled = true;
+            return;
+        }
+
+        const order = orders[currentRound];
+        appendLog(`⚡ --- 第 ${currentRound} 回合戰術階段 ---`, "round");
+
+        // 【邏輯一：Dequeue 自動出貨】
+        if (currentRound % 2 === 0) {
+            // A 廠出列安全檢查 (Underflow 防護)
+            if (barracks_A.length > 0) {
+                let finished = barracks_A.shift(); // JavaScript 的 shift() 等同 Python 的 popleft()
+                appendLog(`【A 廠】⚔️ 生產線回報：[${finished}] 訓練完畢，投入戰場！`, "success");
+            } else {
+                appendLog("⚙️ A 廠產線閒置 (Underflow 防護成功，未觸發空取當機)", "info");
+            }
+            
+            // B 廠出列安全檢查 (Underflow 防護)
+            if (barracks_B.length > 0) {
+                let finished = barracks_B.shift(); 
+                appendLog(`【B 廠】🏹 生產線回報：[${finished}] 訓練完畢，投入戰場！`, "success");
+            } else {
+                appendLog("⚙️ B 廠產線閒置 (Underflow 防護成功，未觸發空取當機)", "info");
+            }
+        }
+
+        // 【邏輯二：Enqueue 處理進貨訂單】
+        if (!order || Object.keys(order).length === 0) {
+            if (currentRound % 2 === 0) {
+                appendLog("💤 玩家本回合待命無動作，單純推進時間軸。", "warn");
+            }
+        } else {
+            let unit = order.unit;
+            let cost = order.cost;
+
+            // A. 資源檢核
+            if (playerGold < cost) {
+                appendLog(`❌ 國庫庫存不足！黃金不夠支付 ${unit} 的訓練經費(${cost}G)。`, "error");
+            } 
+            // B. Overflow 溢位防禦 (雙廠都滿了)
+            else if (barracks_A.length >= MAX_CAPACITY && barracks_B.length >= MAX_CAPACITY) {
+                appendLog(`🚨 警報！雙廠產線全滿！[${unit}] 訂單被強制拒絕 (Overflow 防禦成功)`, "error");
+            } 
+            // C. 智慧負載平衡分派
+            else {
+                if (barracks_A.length <= barracks_B.length && barracks_A.length < MAX_CAPACITY) {
+                    barracks_A.push(unit); // JavaScript 的 push() 等同 Python 的 append()
+                    playerGold -= cost;
+                    appendLog(`📥 核准：[${unit}] 進入 A 廠排隊 (扣除 ${cost}G，剩餘金幣: ${playerGold})`, "warn");
+                } else if (barracks_B.length < MAX_CAPACITY) {
+                    barracks_B.push(unit);
+                    playerGold -= cost;
+                    appendLog(`📥 分流：[${unit}] 進入 B 廠排隊 (扣除 ${cost}G，剩餘金幣: ${playerGold})`, "warn");
+                }
+            }
+        }
+
+        // 更新數據與動態畫面
+        updateUI();
+        
+        currentRound++;
+        if (currentRound === orders.length) {
+            document.getElementById("next-btn").innerText = "戰術演練結束";
+            document.getElementById("next-btn").style.background = "#334155";
+        }
+    }
+
+    // 3. 畫面渲染工具
+    function updateUI() {
+        document.getElementById("round-display").innerText = currentRound;
+        document.getElementById("gold-display").innerText = playerGold;
+        
+        document.getElementById("count-A").innerText = `${barracks_A.length} / 2`;
+        renderVisualQueue("lane-A-queue", barracks_A);
+
+        document.getElementById("count-B").innerText = `${barracks_B.length} / 2`;
+        renderVisualQueue("lane-B-queue", barracks_B);
+    }
+
+    function renderVisualQueue(elementId, queue) {
+        const container = document.getElementById(elementId);
+        container.innerHTML = "";
+
+        for (let i = 0; i < MAX_CAPACITY; i++) {
+            if (i < queue.length) {
+                const unitName = queue[i];
+                const icon = unitIcons[unitName] || "👤";
+                
+                container.innerHTML += `
+                    <div class="unit-card">
+                        <div class="unit-info">
+                            <div class="unit-icon">${icon}</div>
+                            <div class="unit-name">${unitName}</div>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill"></div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML += `<div class="empty-slot">待命空位 ${i+1}</div>`;
+            }
+        }
+    }
+
+    function appendLog(text, type) {
+        const logOutput = document.getElementById("log-output");
+        const line = document.createElement("div");
+        line.className = type === "round" ? "log-round-header" : `log-line log-${type}`;
+        line.innerText = text;
+        logOutput.appendChild(line);
+        logOutput.scrollTop = logOutput.scrollHeight; 
+    }
+</script>
+
+</body>
+</html>
